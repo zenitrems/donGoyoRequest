@@ -3,27 +3,31 @@ import requests
 import datetime
 import time
 import sys
+import concurrent.futures
 import feedparser
 from bs4 import BeautifulSoup
-import concurrent.futures
 
 
 while True:
     print("Actualizando...")
 
     def descarga_medios(url):
-        try: 
+        try:
             response = requests.get(url, stream=True)
             if response.status_code == 200:
-                
+                timestamp_hora = datetime.datetime.now().strftime("%Hh-%Mm")
+                timestamp_dia = datetime.datetime.now().strftime("%Y-%m-%d")
+
+                ruta_con_timestamp = f"results/{timestamp_dia}"
+
                 nombre_archivo = url.split('/')[-1]
-                timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh-%Mm") 
-                ruta_con_timestamp = f"result/{timestamp}/"
+                nombre_archivo_con_timestamp = f"{timestamp_hora}_{nombre_archivo}"
 
                 if not os.path.exists(ruta_con_timestamp):
                     os.makedirs(ruta_con_timestamp)
 
-                ruta_archivo = os.path.join(f"result/{timestamp}/", nombre_archivo)
+                ruta_archivo = os.path.join(
+                    ruta_con_timestamp, nombre_archivo_con_timestamp)
                 with open(ruta_archivo, 'wb') as file:
                     total_size = int(response.headers.get('content-length', 0))
                     downloaded_size = 0
@@ -33,15 +37,16 @@ while True:
                             downloaded_size += len(chunk)
                             progress = int((downloaded_size/total_size) * 50)
                             sys.stdout.write("\r")
-                            sys.stdout.write("[{}{}] {}%".format('=' * progress, ' ' * (50 - progress), progress * 2))
+                            sys.stdout.write("[{}{}] {}%".format(
+                                '=' * progress, ' ' * (50 - progress), progress * 2))
                             sys.stdout.flush()
-                sys.stdout.write("\nArchivo descargado: {} bytes:{}\n".format(nombre_archivo,total_size))                 
+                sys.stdout.write("\nArchivo descargado: {} bytes:{}\n".format(
+                    nombre_archivo, total_size))
             else:
                 sys.stdout.write("\nError en la descarga de: {}\n".format(url))
 
         except Exception as e:
             print("Error inesperado", str(e))
-
 
     def busca_reciente(url_dir):
         try:
@@ -63,7 +68,7 @@ while True:
                 print(f"La peticion termino con error {response.status_code} ")
         except Exception as e:
             print("Error inesperado", str(e))
-    
+
     def sasmex_feed():
         try:
             response = requests.get("https://sasmex.net/rss/sasmex.xml")
@@ -73,22 +78,21 @@ while True:
                 sys.stdout.write("\n {} \n Actualizado: {} \n".format(
                     feed.feed.subtitle,
                     feed.feed.updated
-                    ))
+                ))
                 for entry in feed.entries:
                     sys.stdout.write(
-                    "\n id: {} \n Actualizado: {} \n Titulo: {} \n Summary: {} \n"
-                    .format(
-                    entry.id,
-                    entry.updated,
-                    entry.title,
-                    entry.summary
-                    ))
+                        "\n id: {} \n Actualizado: {} \n Titulo: {} \n Summary: {} \n"
+                        .format(
+                            entry.id,
+                            entry.updated,
+                            entry.title,
+
+                            entry.summary,
+                        ))
             else:
                 print(f"Error al obtener el feed{response.status_code}")
         except Exception as e:
             print("Error inesperado", str(e))
-
-
 
     url_directorios = [
         ("https://www.cenapred.unam.mx/es/RegistrosVolcanPopo/helibanda/Tetexcaloc/"),
@@ -100,17 +104,17 @@ while True:
         ("https://www.cenapred.unam.mx/volcan/popocatepetl/imagenes/hd/imgVolcanPopocatepetl-AltzomoniHD.jpg"),
         ("https://www.cenapred.unam.mx/volcan/popocatepetl/imagenes/hd/imgVolcanPopocatepetl-TlamacasHD.jpg"),
         ("https://www.cenapred.unam.mx/volcan/popocatepetl/imagenes/hd/imgVolcanPopocatepetl-TianguismanalcoHD.jpg"),
-    ]   
-    
+    ]
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         for url_dir in url_directorios:
             executor.map(busca_reciente(url_dir))
         for url in url_medios:
-            executor.map(descarga_medios(url))    
+            executor.map(descarga_medios(url))
 
     sasmex_feed()
     sys.stdout.write("\nCompleto!, Esperando 5 minutos.\n")
     time.sleep(300)  # 5 minutos
 
-#Fuera de servicio
-#https://sasmex.net/rss/sasmex.xml
+# Fuera de servicio
+# https://sasmex.net/rss/sasmex.xml
